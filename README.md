@@ -14,4 +14,8 @@ Generate Basic Auth Key:
 
 Run
 
- 	docker run --rm -it -v "$PWD/ba.key":/server/ba.key -v "$PWD/server.pem":/server/server.pem -v "$PWD/public/":/server/public/ -p 4545:8443 alexivkin/secure-micro-server
+```bash
+docker run --rm -it -v "$PWD/ba.key":/server/ba.key -v "$PWD/server.pem":/server/server.pem -v "$PWD/public/":/server/public/ -p 4545:8443 alexivkin/secure-micro-server
+```
+
+Build as is: `docker build -t <image tag> .`
