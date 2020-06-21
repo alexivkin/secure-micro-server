@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
-import os, ssl, http.server
+import os, ssl, signal, http.server
 from base64 import b64decode
+
+# convert dockers sigterm into ctrl-c and catch it in the exception
+def handle_sigterm(*args):
+    raise KeyboardInterrupt()
 
 class BasicAuthHandler(http.server.SimpleHTTPRequestHandler):
 
@@ -26,11 +30,7 @@ class BasicAuthHandler(http.server.SimpleHTTPRequestHandler):
                 http.server.SimpleHTTPRequestHandler.do_GET(self)
             else:
                 self.do_AUTHHEAD()
-                auth_header = self.headers.get('Authorization')
-                if len(auth_header.split(' ')) > 1:
-                    print(auth_header.split(' ')[1])
-                    print(b64decode(auth_header.split(' ')[1]))
-                print('Unauthorized')
+                print('Unauthorized: ',self.headers.get('Authorization'))
                 self.wfile.write(bytes('Unauthorized', 'utf8'))
         except Exception as ex:
             print("GET exception ",ex)
@@ -42,6 +42,8 @@ class BasicAuthHandler(http.server.SimpleHTTPRequestHandler):
         print("%s - - [%s] %s" % (self.client_address[0],self.log_date_time_string(),format % args))
 
 if __name__ == '__main__':
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
 
     handler = BasicAuthHandler
     handler.server_version = 'microserver'
@@ -55,5 +57,7 @@ if __name__ == '__main__':
     try:
         os.chdir('./public')
         httpd.serve_forever()
+    except KeyboardInterrupt as ex:
+        print('goodbye!')
     except Exception as ex:
         print("Server exception ",ex)
