@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, ssl, signal, http.server
+import os, stat, ssl, signal, http.server
 from base64 import b64decode
 
 # convert dockers sigterm into ctrl-c and catch it in the exception
@@ -22,15 +22,28 @@ class BasicAuthHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            if self.headers.get('Authorization') is None:
-                self.do_AUTHHEAD()
-                print('No Auth Header')
-                self.wfile.write(bytes('Unauthorized', 'utf8'))
-            elif self.headers.get('Authorization') == 'Basic ' + self.key:
-                http.server.SimpleHTTPRequestHandler.do_GET(self)
+            if self.headers.get('Authorization') is not None and self.headers.get('Authorization') == 'Basic ' + self.key:
+                # if correctly authorized
+                filename=os.path.basename(self.path)
+                if os.path.isfile(filename) and bool(os.stat(filename).st_mode & stat.S_IXUSR): # if the file is executable
+                    ret={'filename':filename}
+                    exec(open(filename).read(),globals(),ret) # load the code and run it
+                    if ret['error'] == None:    # if worked, return the stream
+                        self.send_response(200)
+                        self.send_header('Content-type', 'application/octet-stream')
+                        self.send_header('Content-Length',len(ret['result']))
+                        self.end_headers()
+                        self.wfile.write(ret['result'])
+                    else:
+                        self.send_response(501)
+                        self.send_header('Content-type', 'text/html')
+                        self.end_headers()
+                        self.wfile.write(bytes('Server error:' + ret['error'], 'utf8'))
+                else:   # if not executable, return the file
+                    http.server.SimpleHTTPRequestHandler.do_GET(self)
             else:
                 self.do_AUTHHEAD()
-                print('Unauthorized: ',self.headers.get('Authorization'))
+                print('Unauthorized')
                 self.wfile.write(bytes('Unauthorized', 'utf8'))
         except Exception as ex:
             print("GET exception ",ex)
@@ -52,12 +65,15 @@ if __name__ == '__main__':
         handler.key = file.read().replace('\n', '')
 
     httpd = http.server.HTTPServer(('0.0.0.0', 8443), handler)
-    httpd.socket = ssl.wrap_socket(httpd.socket, certfile='./server.pem', server_side=True)
+    sslcontext = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    sslcontext.load_cert_chain(certfile="./server.pem", keyfile="./server.key")
+    httpd.socket = sslcontext.wrap_socket(httpd.socket, server_side=True)
 
     try:
         os.chdir('./public')
+        print("Listening...")
         httpd.serve_forever()
     except KeyboardInterrupt as ex:
-        print('goodbye!')
+        print('Terminating.')
     except Exception as ex:
         print("Server exception ",ex)
