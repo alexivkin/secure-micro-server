@@ -6,7 +6,7 @@ COPY server.py /server/server.py
 RUN pip install --target=/server requests
 
 # start from distroless
-FROM gcr.io/distroless/python3-debian10
+FROM gcr.io/distroless/python3-debian12
 
 COPY --from=builder /server /server
 
